@@ -194,7 +194,11 @@ class HomeScreenRobot {
 
     fun verifyTabMediaControlButtonState(action: String) {
         mDevice.waitNotNull(
-            Until.findObject(By.res("org.mozilla.fenix.debug:id/play_pause_button")),
+            findObject(
+                By
+                    .res("org.mozilla.fenix.debug:id/play_pause_button")
+                    .desc(action)
+            ),
             waitingTime
         )
 
@@ -554,7 +558,7 @@ const val PRIVATE_SESSION_MESSAGE = "Firefox Preview clears your search and brow
         "who uses this device."
 
 private fun assertPrivateSessionMessage(visible: Boolean) =
-    onView(allOf(withText(PRIVATE_SESSION_MESSAGE)))
+    onView(allOf(withId(R.id.private_session_description)))
         .check(
             if (visible) matches(withEffectiveVisibility(Visibility.VISIBLE)) else doesNotExist()
         )
