@@ -4,6 +4,7 @@
 
 package org.mozilla.fenix.ui
 
+import androidx.core.net.toUri
 import androidx.test.espresso.Espresso.openActionBarOverflowOrOptionsMenu
 import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
 import kotlinx.coroutines.runBlocking
@@ -11,17 +12,18 @@ import mozilla.appservices.places.BookmarkRoot
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.mozilla.fenix.ext.bookmarkStorage
 import org.mozilla.fenix.helpers.AndroidAssetDispatcher
 import org.mozilla.fenix.helpers.HomeActivityTestRule
 import org.mozilla.fenix.helpers.TestAssetHelper
+import org.mozilla.fenix.helpers.TestAssetHelper.waitingTimeShort
 import org.mozilla.fenix.helpers.TestHelper.longTapSelectItem
 import org.mozilla.fenix.ui.robots.bookmarksMenu
 import org.mozilla.fenix.ui.robots.browserScreen
 import org.mozilla.fenix.ui.robots.homeScreen
+import org.mozilla.fenix.ui.robots.mDevice
 import org.mozilla.fenix.ui.robots.multipleSelectionToolbar
 import org.mozilla.fenix.ui.robots.navigationToolbar
 
@@ -33,6 +35,8 @@ class BookmarksTest {
 
     private lateinit var mockWebServer: MockWebServer
     private val bookmarksFolderName = "New Folder"
+    private val bookmarkTitle = "Bookmark title"
+    private val bookmarkUrl = "https://www.test.com"
 
     @get:Rule
     val activityTestRule = HomeActivityTestRule()
@@ -95,12 +99,13 @@ class BookmarksTest {
         }
     }
 
-    @Ignore("Intermittent failure on Nexus 6: https://github.com/mozilla-mobile/fenix/issues/8772")
+    // @Ignore("Intermittent failure on Nexus 6: https://github.com/mozilla-mobile/fenix/issues/8772")
     @Test
     fun createBookmarkFolderTest() {
         homeScreen {
         }.openThreeDotMenu {
         }.openBookmarks {
+            mDevice.waitForIdle(waitingTimeShort)
             clickAddFolderButton()
             verifyKeyboardVisible()
             addNewFolderName(bookmarksFolderName)
@@ -116,6 +121,7 @@ class BookmarksTest {
         homeScreen {
         }.openThreeDotMenu {
         }.openBookmarks {
+            mDevice.waitForIdle(waitingTimeShort)
             clickAddFolderButton()
             addNewFolderName(bookmarksFolderName)
             navigateUp()
@@ -124,7 +130,7 @@ class BookmarksTest {
     }
 
     @Test
-    fun editBookmarkViewTest() {
+    fun editBookmarkTest() {
         val defaultWebPage = TestAssetHelper.getGenericAsset(mockWebServer, 1)
 
         browserScreen {
@@ -138,8 +144,13 @@ class BookmarksTest {
             verifyBookmarkNameEditBox()
             verifyBookmarkURLEditBox()
             verifyParentFolderSelector()
-            navigateUp()
-            verifyBookmarksMenuView()
+            changeBookmarkTitle(bookmarkTitle)
+            changeBookmarkUrl(bookmarkUrl)
+            saveEditBookmark()
+            getInstrumentation().waitForIdleSync()
+            verifyBookmarkTitle(bookmarkTitle)
+            verifyBookmarkedURL(bookmarkUrl.toUri())
+            verifyKeyboardHidden()
         }
     }
 
@@ -155,6 +166,24 @@ class BookmarksTest {
         }.openThreeDotMenu {
         }.clickCopy {
             verifyCopySnackBarText()
+        }
+    }
+
+    @Test
+    fun threeDotMenuShareBookmarkTest() {
+        val defaultWebPage = TestAssetHelper.getGenericAsset(mockWebServer, 1)
+
+        browserScreen {
+            createBookmark(defaultWebPage.url)
+        }.openThreeDotMenu {
+        }.openLibrary {
+        }.openBookmarks {
+        }.openThreeDotMenu {
+        }.clickShare {
+            verifyShareOverlay()
+            verifyShareTabFavicon()
+            verifyShareTabTitle()
+            verifyShareTabUrl()
         }
     }
 
@@ -204,6 +233,25 @@ class BookmarksTest {
         }.openThreeDotMenu {
         }.clickDelete {
             verifyDeleteSnackBarText()
+            verifyUndoDeleteSnackBarButton()
+        }
+    }
+
+    @Test
+    fun undoDeleteBookmarkTest() {
+        val defaultWebPage = TestAssetHelper.getGenericAsset(mockWebServer, 1)
+
+        browserScreen {
+            createBookmark(defaultWebPage.url)
+        }.openThreeDotMenu {
+        }.openLibrary {
+        }.openBookmarks {
+        }.openThreeDotMenu {
+        }.clickDelete {
+            verifyUndoDeleteSnackBarButton()
+            clickUndoDeleteButton()
+            verifySnackBarHidden()
+            verifyBookmarkedURL(defaultWebPage.url)
         }
     }
 
@@ -271,7 +319,7 @@ class BookmarksTest {
         }
     }
 
-    @Ignore("Temp disable: Nexus 6 failures - issue: https://github.com/mozilla-mobile/fenix/issues/7417")
+    // @Ignore("Temp disable: Nexus 6 failures - issue: https://github.com/mozilla-mobile/fenix/issues/7417")
     @Test
     fun deleteMultipleSelectionTest() {
         val firstWebPage = TestAssetHelper.getGenericAsset(mockWebServer, 1)
@@ -298,7 +346,7 @@ class BookmarksTest {
     }
 
     @Test
-    fun shareButtonTest() {
+    fun multipleSelectionShareButtonTest() {
         val defaultWebPage = TestAssetHelper.getGenericAsset(mockWebServer, 1)
 
         browserScreen {
@@ -306,6 +354,7 @@ class BookmarksTest {
         }.openThreeDotMenu {
         }.openLibrary {
         }.openBookmarks {
+            mDevice.waitForIdle(waitingTimeShort)
             longTapSelectItem(defaultWebPage.url)
         }
 
@@ -318,12 +367,13 @@ class BookmarksTest {
         }
     }
 
-    @Ignore("Temp disable: Nexus 6 failures - issue: https://github.com/mozilla-mobile/fenix/issues/7417")
+    // @Ignore("Temp disable: Nexus 6 failures - issue: https://github.com/mozilla-mobile/fenix/issues/7417")
     @Test
     fun multipleBookmarkDeletions() {
         homeScreen {
         }.openThreeDotMenu {
         }.openBookmarks {
+            mDevice.waitForIdle(waitingTimeShort)
             createFolder("1")
             getInstrumentation().waitForIdleSync()
             createFolder("2")
@@ -342,6 +392,50 @@ class BookmarksTest {
         }.openThreeDotMenu {
         }.openBookmarks {
             verifyFolderTitle("3")
+        }
+    }
+
+    @Test
+    fun changeBookmarkParentFolderTest() {
+        val defaultWebPage = TestAssetHelper.getGenericAsset(mockWebServer, 1)
+
+        browserScreen {
+            createBookmark(defaultWebPage.url)
+        }.openThreeDotMenu {
+        }.openLibrary {
+        }.openBookmarks {
+        }.openThreeDotMenu {
+        }.clickEdit {
+            verifyEditBookmarksView()
+            changeBookmarkTitle(bookmarkTitle)
+            saveEditBookmark()
+            createFolder(bookmarksFolderName)
+        }.openThreeDotMenu(bookmarkTitle){
+        }.clickEdit {
+            clickParentFolderSelector()
+            selectFolder(bookmarksFolderName)
+            navigateUp()
+            saveEditBookmark()
+            selectFolder(bookmarksFolderName)
+            verifyBookmarkedURL(defaultWebPage.url)
+        }
+    }
+
+    @Test
+    fun navigateBookmarksFolders() {
+        homeScreen {
+        }.openThreeDotMenu {
+        }.openBookmarks {
+            mDevice.waitForIdle(waitingTimeShort)
+            createFolder("1")
+            selectFolder("1")
+            createFolder("2")
+            selectFolder("2")
+            verifyCurrentFolderTitle("2")
+            navigateUp()
+            verifyCurrentFolderTitle("1")
+            mDevice.pressBack()
+            verifyBookmarksMenuView()
         }
     }
 }
